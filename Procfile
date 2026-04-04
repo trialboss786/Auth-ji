@@ -1,1 +1,1 @@
-web: gunicorn stripe1dollerapi:app
+web: gunicorn stripeapi:app

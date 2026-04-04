@@ -1,0 +1,1 @@
+web: gunicorn stripe1dollerapi:app

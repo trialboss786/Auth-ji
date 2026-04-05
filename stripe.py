@@ -7,6 +7,8 @@ app = Flask(__name__)
 
 # ========== CONFIGURATION ==========
 COOKIES = {
+    'wordpress_sec_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7Cc66915f585b0735b582dd6d4cb9c72a865e30f3d6605301a9e9e8550cb4771f5',
+    'wordpress_logged_in_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7C5a8047ffb8c45d6347731b2ced7afdcc7035bd41c7447849a8a9dffd916f530c',
     '__stripe_mid': '11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c',
     '__stripe_sid': '89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908',
 }

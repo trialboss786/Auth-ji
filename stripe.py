@@ -7,23 +7,8 @@ app = Flask(__name__)
 
 # ========== CONFIGURATION ==========
 COOKIES = {
-    'wordpress_sec_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7Cc66915f585b0735b582dd6d4cb9c72a865e30f3d6605301a9e9e8550cb4771f5',
-    'wordpress_logged_in_6a3ae81458afebc3533a2a615b353027': 'kinbbgbossagain%7C1776539591%7CughQ2lODZ2Y5LJLGE90exV5EJUNAazPZZhCDgpNTAfe%7C5a8047ffb8c45d6347731b2ced7afdcc7035bd41c7447849a8a9dffd916f530c',
     '__stripe_mid': '11e2b34c-c4f8-4517-b9f4-6be30a7ca77f76f71c',
     '__stripe_sid': '89890448-7b04-4ed2-9aaf-2a06a800ceb1e18908',
-    '_ga': 'GA1.2.1802109903.1775329974',
-    '_gid': 'GA1.2.1646680589.1775329976',
-    '_ga_S2XYXYZPYM': 'GS2.1.s1775329973$o1$g1$t1775330049$j49$l0$h0',
-    '_ga_SJLJH2CX6D': 'GS2.1.s1775329975$o1$g1$t1775330050$j52$l0$h0',
-    '_gcl_au': '1.1.1001738291.1775329975.813022909.1775329986.1775330050',
-    '__kla_id': 'eyJjaWQiOiJNbVprT0dKa05XVXRaRE13T1MwME1qUXlMVGxsTVdZdE1XWXlPR0l4WVdRMk1UWTQiLCIkZXhjaGFuZ2VfaWQiOiJ5RlItRkJkbm9Fby1qSk5yNkZHRXE5V1NvWG1BbDQ3NDNfZS13TWttaFFXTlktY2ZfRVlnR2ZlNFF5OFkzOU1VLlNMSFRnSiJ9',
-    'sbjs_migrations': '1418474375998%3D1',
-    'sbjs_current_add': 'fd%3D2026-04-04%2019%3A42%3A52%7C%7C%7Cep%3Dhttps%3A%2F%2Fwww.strymon.net%2F%7C%7C%7Crf%3D%28none%29',
-    'sbjs_first_add': 'fd%3D2026-04-04%2019%3A42%3A52%7C%7C%7Cep%3Dhttps%3A%2F%2Fwww.strymon.net%2F%7C%7C%7Crf%3D%28none%29',
-    'sbjs_current': 'typ%3Dtypein%7C%7C%7Csrc%3D%28direct%29%7C%7C%7Cmdm%3D%28none%29%7C%7C%7Ccmp%3D%28none%29%7C%7C%7Ccnt%3D%28none%29%7C%7C%7Ctrm%3D%28none%29%7C%7C%7Cid%3D%28none%29%7C%7C%7Cplt%3D%28none%29%7C%7C%7Cfmt%3D%28none%29%7C%7C%7Ctct%3D%28none%29',
-    'sbjs_first': 'typ%3Dtypein%7C%7C%7Csrc%3D%28direct%29%7C%7C%7Cmdm%3D%28none%29%7C%7C%7Ccmp%3D%28none%29%7C%7C%7Ccnt%3D%28none%29%7C%7C%7Ctrm%3D%28none%29%7C%7C%7Cid%3D%28none%29%7C%7C%7Cplt%3D%28none%29%7C%7C%7Cfmt%3D%28none%29%7C%7C%7Ctct%3D%28none%29',
-    'sbjs_udata': 'vst%3D1%7C%7C%7Cuip%3D%28none%29%7C%7C%7Cuag%3DMozilla%2F5.0%20%28Linux%3B%20Android%2010%3B%20K%29%20AppleWebKit%2F537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome%2F127.0.0.0%20Mobile%20Safari%2F537.36',
-    'sbjs_session': 'pgs%3D7%7C%7C%7Ccpg%3Dhttps%3A%2F%2Fwww.strymon.net%2Fmy-account%2Fpayment-methods%2F',
 }
 
 HEADERS_PAGE = {

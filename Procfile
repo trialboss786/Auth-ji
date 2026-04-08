@@ -1,1 +1,1 @@
-web: gunicorn stripe:app
+web: gunicorn app:app

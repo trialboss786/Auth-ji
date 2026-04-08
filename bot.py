@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 import requests
 import json
@@ -7,12 +6,11 @@ import time
 import random
 import datetime
 from typing import Dict, Any, Optional
-from faker import Faker
 import logging
 
 app = Flask(__name__)
 
-# Manual CORS headers add karne ke liye
+# Manual CORS headers
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -24,7 +22,10 @@ def after_request(response):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-faker = Faker()
+# Simple email generator (without Faker)
+def generate_email():
+    username = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=10))
+    return f"{username}@gmail.com"
 
 def auto_request(
     url: str,
@@ -74,11 +75,8 @@ def auto_request(
     return response
 
 def extract_message(response: requests.Response) -> tuple:
-    """Extract message and success status from response"""
     try:
         response_json = response.json()
-        
-        # Check if success is in response
         success = response_json.get('success', False)
         
         if 'message' in response_json:
@@ -91,16 +89,16 @@ def extract_message(response: requests.Response) -> tuple:
         if "error" in response_json and "message" in response_json["error"]:
             return success, response_json["error"]['message']
         
-        return success, f"Message key not found. Full response: {json.dumps(response_json, indent=2)}"
+        return success, f"Message key not found"
 
     except json.JSONDecodeError:
         match = re.search(r'"message":"(.*?)"', response.text)
         if match:
             return False, match.group(1)
         
-        return False, f"Response is not valid JSON. Status: {response.status_code}. Text: {response.text[:200]}..."
+        return False, f"Response is not valid JSON"
     except Exception as e:
-        return False, f"An unexpected error occurred during message extraction: {e}"
+        return False, f"An unexpected error occurred: {e}"
 
 def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_element, guid, muid, sid):
     
@@ -155,7 +153,7 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
             'Priority': 'u=0, i',
         }
         data_2 = {
-            'email': faker.email(domain="gmail.com"),
+            'email': generate_email(),
             'wc_order_attribution_source_type': 'typein',
             'wc_order_attribution_referrer': '(none)',
             'wc_order_attribution_utm_campaign': '(none)',
@@ -234,7 +232,7 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
         time.sleep(random.uniform(1.0, 3.0))
         
         # Step 4: Final POST request
-        logger.info("4. Performing final POST request with wc-ajax and pm...")
+        logger.info("4. Performing final POST request...")
         url_4 = f'{base_url}/en/'
         headers_4 = {
             'User-Agent': user_ag,
@@ -261,10 +259,8 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
         
         response_4 = auto_request(url_4, method='POST', headers=headers_4, dynamic_params=dynamic_params_4, session=session)
         
-        # Extract message and status
         success, message = extract_message(response_4)
         
-        # Try to get more detailed error if available
         try:
             response_json = response_4.json()
             if not success and 'data' in response_json and 'error' in response_json['data']:
@@ -282,11 +278,6 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
 
 @app.route('/strip', methods=['GET'])
 def process_card():
-    """
-    Endpoint to process card payment
-    Format: /strip?cc=4097581393841577|06|32|537
-    """
-    # Get cc parameter
     cc_param = request.args.get('cc', '')
     
     if not cc_param:
@@ -299,7 +290,6 @@ def process_card():
             }
         }), 400
     
-    # Parse card details (format: number|month|year|cvv)
     try:
         parts = cc_param.split('|')
         if len(parts) != 4:
@@ -307,7 +297,7 @@ def process_card():
                 "success": False,
                 "data": {
                     "error": {
-                        "message": "Invalid format. Use: card_number|exp_month|exp_year|cvv (e.g., 4097581393841577|06|32|537)"
+                        "message": "Invalid format. Use: card_number|exp_month|exp_year|cvv"
                     }
                 }
             }), 400
@@ -317,7 +307,6 @@ def process_card():
         card_year = parts[2].strip()
         card_cvv = parts[3].strip()
         
-        # Validate card number
         if not card_number.isdigit() or len(card_number) < 15:
             return jsonify({
                 "success": False,
@@ -328,7 +317,6 @@ def process_card():
                 }
             }), 400
             
-        # Validate month
         if not card_month.isdigit() or int(card_month) < 1 or int(card_month) > 12:
             return jsonify({
                 "success": False,
@@ -339,7 +327,6 @@ def process_card():
                 }
             }), 400
             
-        # Validate year
         if not card_year.isdigit() or len(card_year) != 2:
             return jsonify({
                 "success": False,
@@ -350,7 +337,6 @@ def process_card():
                 }
             }), 400
             
-        # Validate CVV
         if not card_cvv.isdigit() or len(card_cvv) < 3:
             return jsonify({
                 "success": False,
@@ -371,14 +357,12 @@ def process_card():
             }
         }), 400
     
-    # Generate dynamic values
     USER_AGENT = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
     CLIENT_ELEMENT = f'src_{random.randint(1000000000000, 9999999999999)}abcdef'
     GUID = f'guid_{random.randint(1000000000000000000, 9999999999999999999)}'
     MUID = f'muid_{random.randint(1000000000000000000, 9999999999999999999)}'
     SID = f'sid_{random.randint(1000000000000000000, 9999999999999999999)}'
     
-    # Process the card
     success, message = run_automated_process(
         card_num=card_number,
         card_cvv=card_cvv,
@@ -391,7 +375,6 @@ def process_card():
         sid=SID
     )
     
-    # Format response as requested
     if success:
         return jsonify({
             "success": True,
@@ -411,9 +394,7 @@ def process_card():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
-    # Run on all interfaces, port 5000
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False)

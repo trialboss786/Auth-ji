@@ -75,30 +75,93 @@ def auto_request(
     return response
 
 def extract_message(response: requests.Response) -> tuple:
+    """Extract message and success status from response - FIXED VERSION"""
     try:
         response_json = response.json()
+        
+        # Log full response for debugging
+        logger.info(f"Full Response JSON: {json.dumps(response_json, indent=2)}")
+        
+        # Check if success is in response
         success = response_json.get('success', False)
         
-        if 'message' in response_json:
-            return success, response_json['message']
+        # Initialize message variable
+        message = None
         
-        for value in response_json.values():
-            if isinstance(value, dict) and 'message' in value:
-                return success, value['message']
+        # CASE 1: Success response with data
+        if success:
+            # Try different possible message locations for success
+            if 'message' in response_json:
+                message = response_json['message']
+            elif 'data' in response_json:
+                if 'message' in response_json['data']:
+                    message = response_json['data']['message']
+                elif 'status' in response_json['data']:
+                    message = f"Payment method {response_json['data']['status']}"
+                elif 'setup_intent' in response_json['data']:
+                    status = response_json['data']['setup_intent'].get('status', 'succeeded')
+                    message = f"Setup intent {status}"
+                else:
+                    message = "Payment method added successfully"
+            elif 'status' in response_json:
+                message = response_json['status']
+            else:
+                message = "Payment method added successfully"
+            
+            return True, message
         
-        if "error" in response_json and "message" in response_json["error"]:
-            return success, response_json["error"]['message']
+        # CASE 2: Error/Decline response
+        else:
+            # Try different possible error locations
+            if 'message' in response_json:
+                message = response_json['message']
+            elif 'data' in response_json:
+                if 'error' in response_json['data']:
+                    if 'message' in response_json['data']['error']:
+                        message = response_json['data']['error']['message']
+                    else:
+                        message = str(response_json['data']['error'])
+                elif 'message' in response_json['data']:
+                    message = response_json['data']['message']
+                else:
+                    message = "Card was declined"
+            elif 'error' in response_json:
+                if 'message' in response_json['error']:
+                    message = response_json['error']['message']
+                else:
+                    message = str(response_json['error'])
+            else:
+                message = "Card was declined"
+            
+            return False, message
         
-        return success, f"Message key not found"
-
     except json.JSONDecodeError:
+        # Response is not JSON, try to extract from text
+        logger.info(f"Response is not JSON, trying to extract from text: {response.text[:500]}")
+        
+        # Try to find message in HTML/text
         match = re.search(r'"message":"(.*?)"', response.text)
+        if match:
+            message = match.group(1)
+            # Check if it's a success response
+            if '"success":true' in response.text or '"success": true' in response.text:
+                return True, message
+            return False, message
+        
+        # Try to find error message
+        match = re.search(r'"error":"(.*?)"', response.text)
         if match:
             return False, match.group(1)
         
-        return False, f"Response is not valid JSON"
+        # Check HTTP status code
+        if response.status_code == 200:
+            return True, "Request completed successfully"
+        else:
+            return False, f"Request failed with status {response.status_code}"
+            
     except Exception as e:
-        return False, f"An unexpected error occurred: {e}"
+        logger.error(f"Error extracting message: {e}")
+        return False, f"An unexpected error occurred: {str(e)}"
 
 def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_element, guid, muid, sid):
     
@@ -259,14 +322,15 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
         
         response_4 = auto_request(url_4, method='POST', headers=headers_4, dynamic_params=dynamic_params_4, session=session)
         
+        # Extract message and status using improved function
         success, message = extract_message(response_4)
         
-        try:
-            response_json = response_4.json()
-            if not success and 'data' in response_json and 'error' in response_json['data']:
-                message = response_json['data']['error'].get('message', message)
-        except:
-            pass
+        # Final fallback: If message is still empty or not found
+        if not message or message == "Message key not found":
+            if success:
+                message = "Payment method added successfully"
+            else:
+                message = "Card was declined"
         
         logger.info(f"Final Result - Success: {success}, Message: {message}")
         
@@ -278,6 +342,11 @@ def run_automated_process(card_num, card_cvv, card_yy, card_mm, user_ag, client_
 
 @app.route('/strip', methods=['GET'])
 def process_card():
+    """
+    Endpoint to process card payment
+    Format: /strip?cc=4097581393841577|06|32|537
+    """
+    # Get cc parameter
     cc_param = request.args.get('cc', '')
     
     if not cc_param:
@@ -290,6 +359,7 @@ def process_card():
             }
         }), 400
     
+    # Parse card details (format: number|month|year|cvv)
     try:
         parts = cc_param.split('|')
         if len(parts) != 4:
@@ -297,7 +367,7 @@ def process_card():
                 "success": False,
                 "data": {
                     "error": {
-                        "message": "Invalid format. Use: card_number|exp_month|exp_year|cvv"
+                        "message": "Invalid format. Use: card_number|exp_month|exp_year|cvv (e.g., 4097581393841577|06|32|537)"
                     }
                 }
             }), 400
@@ -307,6 +377,7 @@ def process_card():
         card_year = parts[2].strip()
         card_cvv = parts[3].strip()
         
+        # Validate card number
         if not card_number.isdigit() or len(card_number) < 15:
             return jsonify({
                 "success": False,
@@ -317,6 +388,7 @@ def process_card():
                 }
             }), 400
             
+        # Validate month
         if not card_month.isdigit() or int(card_month) < 1 or int(card_month) > 12:
             return jsonify({
                 "success": False,
@@ -327,6 +399,7 @@ def process_card():
                 }
             }), 400
             
+        # Validate year
         if not card_year.isdigit() or len(card_year) != 2:
             return jsonify({
                 "success": False,
@@ -337,6 +410,7 @@ def process_card():
                 }
             }), 400
             
+        # Validate CVV
         if not card_cvv.isdigit() or len(card_cvv) < 3:
             return jsonify({
                 "success": False,
@@ -357,12 +431,14 @@ def process_card():
             }
         }), 400
     
+    # Generate dynamic values
     USER_AGENT = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
     CLIENT_ELEMENT = f'src_{random.randint(1000000000000, 9999999999999)}abcdef'
     GUID = f'guid_{random.randint(1000000000000000000, 9999999999999999999)}'
     MUID = f'muid_{random.randint(1000000000000000000, 9999999999999999999)}'
     SID = f'sid_{random.randint(1000000000000000000, 9999999999999999999)}'
     
+    # Process the card
     success, message = run_automated_process(
         card_num=card_number,
         card_cvv=card_cvv,
@@ -375,6 +451,7 @@ def process_card():
         sid=SID
     )
     
+    # Format response as requested
     if success:
         return jsonify({
             "success": True,
@@ -394,7 +471,10 @@ def process_card():
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    # Run on all interfaces, port 5000 or use Railway's PORT
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
